@@ -1,3 +1,5 @@
+-- Based on https://github.com/soumith/cvpr2015/blob/master/Deep%20Learning%20with%20Torch.ipynb
+
 require 'itorch'
 require 'nn';
 function download_data ()
