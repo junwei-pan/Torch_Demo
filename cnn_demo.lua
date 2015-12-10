@@ -2,7 +2,7 @@
 
 require 'itorch'
 require 'nn';
-function download_data ()
+function download_data()
     os.execute('wget -c https://s3.amazonaws.com/torch7/data/cifar10torchsmall.zip')
     os.execute('unzip cifar10torchsmall.zip')
 end
@@ -21,7 +21,7 @@ function shallowcopy(orig)
     return copy
 end
 
-function init_net ()
+function setup_net ()
     net = nn.Sequential()
     net:add(nn.SpatialConvolution(3, 20, 5, 5)) -- 3 input image channels, 6 output channels, 5x5 convolution kernel
     net:add(nn.SpatialMaxPooling(2,2,2,2))     -- A max-pooling operation that looks at 2x2 windows and finds the max.
@@ -36,7 +36,6 @@ function init_net ()
 end
 
 function evaluate_cunn ()
-    
     correct = 0
     d_wc = {}
     for i=1,10000 do
@@ -66,9 +65,7 @@ function evaluate_cunn ()
     end
 end
 
-
 function evaluate ()
-    
     correct = 0
     for i=1,10000 do
         local groundtruth = testset.label[i]
@@ -96,8 +93,37 @@ function evaluate ()
     end
 end
 
+function train(maxIteration)
+    net = setup_net()
+    criterion = nn.ClassNLLCriterion()
+    trainer = nn.StochasticGradient(net, criterion)
+    trainer.learningRate = 0.001
+    trainer.maxIteration = maxIteration -- just do 5 epochs of training
+    t_start = os.time()
+    trainer:train(trainset)
+    print("----->Time<-----")
+    print(os.difftime(os.time(), t_start))
+end
+
+function train_cuda(maxIteration)
+    require 'cunn'
+    net = setup_net()
+    net = net:cuda()
+    criterion = criterion:cuda()
+    trainset.data = trainset.data:cuda()
+    trainer = nn.StochasticGradient(net, criterion)
+    trainer.learningRate = 0.001
+    trainer.maxIteration = maxIteration -- just do 5 epochs of training.
+    t_start = os.time()
+    trainer:train(trainset)
+    print("----->Time<-----")
+    print(os.difftime(os.time(), t_start))
+end
+
 trainset = torch.load('data/cifar10-train.t7')
 testset = torch.load('data/cifar10-test.t7')
+--trainset = torch.load('data/mnist/train.csv')
+--testset = torch.load('data/mnist/test.csv')
 classes = {'airplane', 'automobile', 'bird', 'cat',
            'deer', 'dog', 'frog', 'horse', 'ship', 'truck'}
 
@@ -136,30 +162,10 @@ for i=1,3 do -- over each image channel
 end
 
 -- Set up network
-net = init_net()
 maxIteration = 1
 
-criterion = nn.ClassNLLCriterion()
-trainer = nn.StochasticGradient(net, criterion)
-trainer.learningRate = 0.001
-trainer.maxIteration = maxIteration -- just do 5 epochs of training
-t_start = os.time()
-trainer:train(trainset)
-print("----->Time<-----")
-print(os.difftime(os.time(), t_start))
-
+train(maxIteration)
 evaluate(testset)
-require 'cunn'
-net = init_net()
-net = net:cuda()
-criterion = criterion:cuda()
-trainset.data = trainset.data:cuda()
-trainer = nn.StochasticGradient(net, criterion)
-trainer.learningRate = 0.001
-trainer.maxIteration = maxIteration -- just do 5 epochs of training.
-t_start = os.time()
-trainer:train(trainset)
-print("----->Time<-----")
-print(os.difftime(os.time(), t_start))
 
+train_cuda(maxIteration)
 evaluate_cunn(testset)
